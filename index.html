@@ -1,0 +1,634 @@
+<!-- Chosen Palette: Warm Neutrals (Stone/Warm Gray) with Deep Slate and Burnt Orange accents. Background is light Stone-50. -->
+
+<!-- Application Structure Plan: 
+     The application is designed as a "Cybersecurity Knowledge Dashboard" with a tabbed navigation structure to manage the density of information.
+     1. **Hero Section**: Sets the context of the curriculum.
+     2. **Module 1: Recon & Analysis**: Focuses on the "Instruments" vs "Toolbox" distinction and Network Analysis (Wireshark/Tcpdump). Uses interactive cards.
+     3. **Module 2: The Open Source Arsenal**: A filterable interactive grid of the Top 10 Tools, paired with a Chart.js visualization of tool distribution by category.
+     4. **Module 3: Defense Infrastructure**: A dual-view section covering Firewall Evolution (iptables vs nftables) with a performance comparison chart, and the Hardening/MAC workflow.
+     5. **Module 4: Advanced OpSec**: An interactive timeline/accordion for the 8-week syllabus and a "Flashcard" section for Decentralized Tech terminology.
+     
+     **User Flow**: Users navigate via the top bar. Dynamic content updates without page reloads. Charts provide visual summaries of conceptual data (e.g., performance differences).
+-->
+
+<!-- Visualization & Content Choices:
+     1. **Tool Distribution Chart (Chart.js)**: Goal: Inform. Method: Doughnut Chart. Visualizes the balance of offensive vs. defensive tools in the Top 10 list. Interaction: Clicking legend toggles segments.
+     2. **Firewall Performance Comparison (Chart.js)**: Goal: Compare. Method: Bar Chart. Conceptually visualizes the "Linear" vs "O(1)" performance gap between iptables and nftables.
+     3. **Interactive Syllabus**: Goal: Change/Explore. Method: Accordion list. Users expand weeks to see details, keeping the interface clean.
+     4. **Hardening Flow**: Goal: Process. Method: Vertical Step-by-Step visual guide using CSS borders and JS interactions.
+     5. **NO SVG/Mermaid**: All icons are Unicode. All graphics are Canvas or CSS shapes.
+-->
+
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cybersecurity Curriculum Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafaf9; /* stone-50 */
+            color: #1c1917; /* stone-900 */
+        }
+
+        /* Chart Container Styling - Mandatory Requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* max-w-2xl equivalent approx */
+            height: 350px;
+            max-height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab-active {
+            border-bottom: 3px solid #ea580c; /* orange-600 */
+            color: #ea580c;
+            font-weight: 600;
+        }
+
+        .tab-inactive {
+            color: #78716c; /* stone-500 */
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-inactive:hover {
+            color: #44403c; /* stone-700 */
+        }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Hide scrollbar for clean horizontal scrolling if needed */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-stone-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-3xl">🛡️</span>
+                    <div>
+                        <h1 class="text-xl font-bold text-stone-800 tracking-tight">CyberSec<span class="text-orange-600">Edu</span></h1>
+                        <p class="text-xs text-stone-500 hidden sm:block">Comprehensive Tools & Curriculum Guide</p>
+                    </div>
+                </div>
+                <!-- Mobile Menu Button (concept only, using simple scroll tab for simplicity in SPA) -->
+            </div>
+            <!-- Navigation -->
+            <nav class="flex space-x-8 overflow-x-auto no-scrollbar pb-1" id="nav-container">
+                <button onclick="switchTab('recon')" id="tab-recon" class="tab-active whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors">
+                    Recon & Analysis
+                </button>
+                <button onclick="switchTab('arsenal')" id="tab-arsenal" class="tab-inactive whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors">
+                    The Arsenal
+                </button>
+                <button onclick="switchTab('defense')" id="tab-defense" class="tab-inactive whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors">
+                    Defense Infrastructure
+                </button>
+                <button onclick="switchTab('opsec')" id="tab-opsec" class="tab-inactive whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors">
+                    Adv. OpSec & Privacy
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- INTRO / CONTEXT BLOCK (Visible on all tabs initially, can be dismissed or stays as header) -->
+        <div id="intro-block" class="mb-8 p-6 bg-stone-100 rounded-xl border border-stone-200">
+            <h2 class="text-2xl font-bold text-stone-800 mb-2">Welcome to the Cybersecurity Curriculum</h2>
+            <p class="text-stone-600 max-w-3xl">
+                This dashboard aggregates essential knowledge on network analysis, penetration testing ecosystems, open-source security tools, and advanced operational security. Use the tabs above to explore the different modules of the curriculum.
+            </p>
+        </div>
+
+        <!-- TAB 1: RECON & ANALYSIS -->
+        <div id="view-recon" class="space-y-8 animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Analysis Tools -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="text-2xl p-2 bg-orange-100 rounded-lg">📡</span>
+                        <h3 class="text-xl font-bold text-stone-800">Network Analysis Triad</h3>
+                    </div>
+                    <p class="text-stone-600 mb-6 text-sm">
+                        Clarifying the relationship between Wireshark, tcpdump, and tshark. A common misconception is that tcpdump is the CLI for Wireshark.
+                    </p>
+                    
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4 py-2 bg-stone-50 rounded-r-lg">
+                            <h4 class="font-bold text-stone-900">Wireshark</h4>
+                            <p class="text-sm text-stone-600">The GUI tool for deep packet inspection. User-friendly but heavy.</p>
+                        </div>
+                        <div class="border-l-4 border-stone-500 pl-4 py-2 bg-stone-50 rounded-r-lg">
+                            <h4 class="font-bold text-stone-900">tcpdump</h4>
+                            <p class="text-sm text-stone-600">Standalone CLI packet capture tool. Essential for headless servers. <strong>Not</strong> part of Wireshark.</p>
+                        </div>
+                        <div class="border-l-4 border-orange-500 pl-4 py-2 bg-stone-50 rounded-r-lg">
+                            <h4 class="font-bold text-stone-900">tshark</h4>
+                            <p class="text-sm text-stone-600">The <strong>official</strong> CLI for Wireshark. Supports Wireshark dissectors and filters.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ecosystem Concept -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="text-2xl p-2 bg-stone-200 rounded-lg">🧰</span>
+                        <h3 class="text-xl font-bold text-stone-800">The Toolbox vs. The Instruments</h3>
+                    </div>
+                    <p class="text-stone-600 mb-6 text-sm">
+                        Understanding the distinction between the Operating System (Platform) and the specific Tools (Applications).
+                    </p>
+
+                    <div class="flex flex-col gap-4">
+                        <!-- Platform -->
+                        <div class="bg-stone-800 text-stone-50 p-4 rounded-lg shadow-md relative overflow-hidden group cursor-pointer hover:bg-stone-700 transition">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl group-hover:scale-110 transition">🐧</div>
+                            <h4 class="font-bold text-lg">The "Toolbox" (OS)</h4>
+                            <p class="text-stone-300 text-sm mt-1">Kali Linux & Parrot OS</p>
+                            <p class="text-xs text-stone-400 mt-2">Debian-based platforms pre-installed with thousands of auditing tools.</p>
+                        </div>
+
+                        <!-- Arrow -->
+                        <div class="flex justify-center text-stone-400 text-xl">⬇️ Contains</div>
+
+                        <!-- Tools -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-orange-50 border border-orange-200 p-3 rounded-lg text-center">
+                                <span class="block text-2xl mb-1">🔭</span>
+                                <h5 class="font-bold text-stone-800 text-sm">Scanners</h5>
+                                <p class="text-xs text-stone-500">Nmap, Zenmap</p>
+                            </div>
+                            <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center">
+                                <span class="block text-2xl mb-1">🔬</span>
+                                <h5 class="font-bold text-stone-800 text-sm">Analyzers</h5>
+                                <p class="text-xs text-stone-500">Wireshark, tcpdump</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: THE ARSENAL -->
+        <div id="view-arsenal" class="hidden space-y-8 animate-fade-in">
+            <!-- Controls & Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Filters -->
+                <div class="lg:col-span-2">
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-bold text-stone-800 mb-2">Top 10 Open Source Tools</h3>
+                        <p class="text-stone-600">Explore the essential ecosystem. Filter by category to find the right tool for the job.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-6" id="tool-filters">
+                        <button onclick="filterTools('all')" class="px-4 py-2 bg-stone-800 text-white rounded-full text-sm hover:bg-stone-700 transition shadow-sm filter-btn active-filter" data-category="all">All Tools</button>
+                        <button onclick="filterTools('Exploitation')" class="px-4 py-2 bg-white text-stone-600 border border-stone-300 rounded-full text-sm hover:bg-stone-50 transition shadow-sm filter-btn" data-category="Exploitation">Exploitation</button>
+                        <button onclick="filterTools('Web')" class="px-4 py-2 bg-white text-stone-600 border border-stone-300 rounded-full text-sm hover:bg-stone-50 transition shadow-sm filter-btn" data-category="Web">Web Security</button>
+                        <button onclick="filterTools('Cracking')" class="px-4 py-2 bg-white text-stone-600 border border-stone-300 rounded-full text-sm hover:bg-stone-50 transition shadow-sm filter-btn" data-category="Cracking">Password Cracking</button>
+                        <button onclick="filterTools('Defense')" class="px-4 py-2 bg-white text-stone-600 border border-stone-300 rounded-full text-sm hover:bg-stone-50 transition shadow-sm filter-btn" data-category="Defense">Defense</button>
+                    </div>
+                    
+                    <!-- Tools Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="tools-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Visualization -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h4 class="font-bold text-stone-800 mb-4 text-center">Ecosystem Distribution</h4>
+                    <p class="text-xs text-stone-500 text-center mb-4">Breakdown of the top 10 tools by primary function.</p>
+                    <div class="chart-container">
+                        <canvas id="toolsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: DEFENSE INFRASTRUCTURE -->
+        <div id="view-defense" class="hidden space-y-8 animate-fade-in">
+            
+            <!-- Firewall Evolution -->
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                <div class="p-6 border-b border-stone-100 bg-stone-50">
+                    <h3 class="text-xl font-bold text-stone-800">Firewall Evolution: iptables vs. nftables</h3>
+                    <p class="text-stone-600 text-sm">Why modern systems are moving to nftables for performance and simplicity.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <!-- Text Comparison -->
+                    <div class="p-6 space-y-4">
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-stone-800 text-sm uppercase tracking-wide">Key Improvements</h4>
+                            <ul class="space-y-2 text-sm text-stone-600">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-green-500 font-bold">✓</span>
+                                    <span><strong>Atomic Updates:</strong> Update all rules at once. No broken intermediate states.</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-green-500 font-bold">✓</span>
+                                    <span><strong>Dual Stack:</strong> One rule handles both IPv4 and IPv6 (`inet` family).</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-green-500 font-bold">✓</span>
+                                    <span><strong>Performance:</strong> Uses Sets & Maps for O(1) lookups instead of linear O(n).</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-green-500 font-bold">✓</span>
+                                    <span><strong>Syntax:</strong> Human-readable, structured like C/tcpdump.</span>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-stone-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                            <p class="text-stone-500"># Migration Command</p>
+                            <p>$ iptables-save > rules.txt</p>
+                            <p>$ iptables-restore-translate -f rules.txt</p>
+                        </div>
+                    </div>
+
+                    <!-- Chart -->
+                    <div class="p-6 bg-stone-50 flex flex-col justify-center items-center">
+                        <h4 class="font-bold text-stone-800 mb-2 text-sm">Conceptual Performance Scaling</h4>
+                        <div class="chart-container" style="height: 250px;">
+                            <canvas id="firewallChart"></canvas>
+                        </div>
+                        <p class="text-xs text-stone-400 mt-2 text-center">As rule count increases, iptables slows down linearly. nftables remains nearly constant.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hardening Workflow -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-stone-800">Hardening & MAC Integration</h3>
+                    <p class="text-stone-600 text-sm">
+                        AppArmor and SELinux are the <strong>final layer</strong>. They must be built upon a hardened foundation.
+                    </p>
+                </div>
+
+                <div class="relative">
+                    <!-- Connecting Line -->
+                    <div class="absolute left-8 top-4 bottom-4 w-1 bg-stone-200"></div>
+
+                    <div class="space-y-8">
+                        <!-- Step 1 -->
+                        <div class="relative flex items-start gap-6 group">
+                            <div class="z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white border-4 border-stone-200 group-hover:border-orange-500 transition-colors shadow-sm text-2xl">
+                                🚀
+                            </div>
+                            <div class="flex-1 pt-2">
+                                <h4 class="text-lg font-bold text-stone-800">1. Deploy</h4>
+                                <p class="text-stone-600 text-sm">Install the service (e.g., Nginx). Ensure it functions correctly in a default state.</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="relative flex items-start gap-6 group">
+                            <div class="z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white border-4 border-stone-200 group-hover:border-orange-500 transition-colors shadow-sm text-2xl">
+                                🔒
+                            </div>
+                            <div class="flex-1 pt-2">
+                                <h4 class="text-lg font-bold text-stone-800">2. Harden (Base DAC)</h4>
+                                <p class="text-stone-600 text-sm">Configure standard permissions. Create specific users. Disable unused modules. Harden SSH.</p>
+                                <div class="mt-2 text-xs bg-stone-100 p-2 rounded text-stone-500 inline-block">
+                                    "Attack Surface Reduction"
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="relative flex items-start gap-6 group">
+                            <div class="z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white border-4 border-orange-500 shadow-md text-2xl">
+                                🛡️
+                            </div>
+                            <div class="flex-1 pt-2">
+                                <h4 class="text-lg font-bold text-orange-700">3. Confine (MAC)</h4>
+                                <p class="text-stone-600 text-sm">Write the AppArmor profile or SELinux Type Enforcement. Lock the process in a sandbox.</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="relative flex items-start gap-6 group">
+                            <div class="z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white border-4 border-stone-200 group-hover:border-orange-500 transition-colors shadow-sm text-2xl">
+                                🧪
+                            </div>
+                            <div class="flex-1 pt-2">
+                                <h4 class="text-lg font-bold text-stone-800">4. Test & Audit</h4>
+                                <p class="text-stone-600 text-sm">Attempt to break out. Check audit logs (`journalctl`) for denials. Refine policy.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: ADVANCED OPSEC -->
+        <div id="view-opsec" class="hidden space-y-8 animate-fade-in">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Syllabus -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div>
+                        <h3 class="text-2xl font-bold text-stone-800">Advanced OpSec Curriculum</h3>
+                        <p class="text-stone-600 text-sm">A 5-module course bridging privacy engineering and decentralized infrastructure.</p>
+                    </div>
+
+                    <div id="syllabus-container" class="space-y-4">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Terminology / Flashcards -->
+                <div class="space-y-6">
+                    <div class="bg-stone-800 text-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4 text-orange-400">The Sovereign Stack</h3>
+                        <p class="text-stone-300 text-sm mb-6">Key terminology for decentralized and secure technology ecosystems.</p>
+
+                        <div class="space-y-4" id="terms-container">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                        <h4 class="font-bold text-stone-800 mb-2">Target Audience</h4>
+                        <ul class="text-sm text-stone-600 space-y-2 list-disc list-inside">
+                            <li>High-Risk Individuals (Journalists)</li>
+                            <li>Blue Team Security Pros</li>
+                            <li>Crypto Natives & DePIN users</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-stone-200 mt-auto py-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-stone-500 text-sm">
+            <p>© 2025 Cybersecurity Curriculum Guide.</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- DATA STORE ---
+        const toolsData = [
+            { id: 1, name: "Metasploit", category: "Exploitation", desc: "The world’s most used framework for developing and executing exploit code.", icon: "💥" },
+            { id: 2, name: "OWASP ZAP", category: "Web", desc: "Leading open-source web app scanner. Intercepts/modifies traffic.", icon: "🕷️" },
+            { id: 3, name: "Aircrack-ng", category: "Wireless", desc: "Swiss Army Knife for WiFi hacking (WEP, WPA, WPA2).", icon: "📡" },
+            { id: 4, name: "Hashcat", category: "Cracking", desc: "GPU-based password cracker. Guesses millions of passwords/sec.", icon: "⚡" },
+            { id: 5, name: "John the Ripper", category: "Cracking", desc: "Versatile CPU-based cracker. Detects hash types automatically.", icon: "🔨" },
+            { id: 6, name: "SQLMap", category: "Web", desc: "Automates detection/exploitation of SQL injection flaws.", icon: "💉" },
+            { id: 7, name: "Hydra", category: "Cracking", desc: "Fast network login cracker for live services (SSH, FTP).", icon: "🐉" },
+            { id: 8, name: "OpenVAS", category: "Defense", desc: "Vulnerability Scanner. Scans infrastructure for patch holes.", icon: "🔍" },
+            { id: 9, name: "Snort", category: "Defense", desc: "Industry standard open-source NIDS (Intrusion Detection).", icon: "🐽" },
+            { id: 10, name: "Wazuh", category: "Defense", desc: "SIEM & XDR. Security Operations Center in a box.", icon: "🏰" }
+        ];
+
+        const syllabusData = [
+            { title: "Module 1: The Architecture of Invisibility", topics: ["Privacy vs. Anonymity", "Tor vs. I2P", "ProxyChains & VPN chaining", "Fingerprinting evasion"] },
+            { title: "Module 2: The Amnesic Workspace", topics: ["Tails OS (Leave no trace)", "Whonix (Gateway vs Workstation)", "Qubes OS (Xen Hypervisor isolation)"] },
+            { title: "Module 3: Endpoint Hardening", topics: ["Windows: Debloating, AppLocker", "Linux: Kernel hardening, AppArmor/SELinux", "Disk Encryption (LUKS)"] },
+            { title: "Module 4: The Decentralized Economy", topics: ["Crypto Cold Storage", "Golem Network (Decentralized Compute)", "IPFS (Web3 Storage)"] },
+            { title: "Module 5: Capstone - The Golem's Ghost", topics: ["Deploy secure Qubes OS", "Route Linux VM via Whonix", "Execute anonymous Golem task"] }
+        ];
+
+        const termsData = [
+            { term: "The DWeb", def: "Decentralized Web. Focus on resilience/ownership (IPFS, Nostr)." },
+            { term: "Darknet", def: "Overlay networks requiring specific software (Tor, I2P)." },
+            { term: "Freedom Tech", def: "Tools protecting human rights & sovereignty (Monero, Briar)." },
+            { term: "Censorship-Resistant", def: "Infrastructure robust against takedowns." }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentTab = 'recon';
+        let activeToolFilter = 'all';
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTools();
+            renderSyllabus();
+            renderTerms();
+            initCharts();
+        });
+
+        // --- NAVIGATION LOGIC ---
+        function switchTab(tabId) {
+            // Update Tab Styles
+            ['recon', 'arsenal', 'defense', 'opsec'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                const view = document.getElementById(`view-${t}`);
+                
+                if (t === tabId) {
+                    btn.className = "tab-active whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors cursor-default";
+                    view.classList.remove('hidden');
+                } else {
+                    btn.className = "tab-inactive whitespace-nowrap py-4 px-1 text-sm font-medium transition-colors cursor-pointer";
+                    view.classList.add('hidden');
+                }
+            });
+            currentTab = tabId;
+        }
+
+        // --- RENDER FUNCTIONS ---
+        function renderTools() {
+            const container = document.getElementById('tools-grid');
+            container.innerHTML = '';
+
+            const filtered = activeToolFilter === 'all' 
+                ? toolsData 
+                : toolsData.filter(t => t.category === activeToolFilter || (activeToolFilter === 'Web' && t.category === 'Web'));
+
+            filtered.forEach(tool => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-lg border border-stone-200 card-hover flex items-start gap-4";
+                div.innerHTML = `
+                    <div class="text-3xl bg-stone-50 p-2 rounded-lg">${tool.icon}</div>
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h4 class="font-bold text-stone-800">${tool.name}</h4>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 border border-stone-200">${tool.category}</span>
+                        </div>
+                        <p class="text-sm text-stone-600 leading-snug">${tool.desc}</p>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterTools(category) {
+            activeToolFilter = category;
+            
+            // Update button styles
+            document.querySelectorAll('#tool-filters button').forEach(btn => {
+                if(btn.dataset.category === category) {
+                    btn.classList.remove('bg-white', 'text-stone-600');
+                    btn.classList.add('bg-stone-800', 'text-white');
+                } else {
+                    btn.classList.add('bg-white', 'text-stone-600');
+                    btn.classList.remove('bg-stone-800', 'text-white');
+                }
+            });
+            
+            renderTools();
+        }
+
+        function renderSyllabus() {
+            const container = document.getElementById('syllabus-container');
+            container.innerHTML = '';
+            
+            syllabusData.forEach((mod, index) => {
+                const detailsId = `syllabus-details-${index}`;
+                div = document.createElement('div');
+                div.className = "bg-white rounded-lg border border-stone-200 overflow-hidden";
+                div.innerHTML = `
+                    <button onclick="toggleSyllabus('${detailsId}')" class="w-full flex justify-between items-center p-4 text-left hover:bg-stone-50 transition">
+                        <span class="font-bold text-stone-800">${mod.title}</span>
+                        <span class="text-stone-400 text-xl transform transition-transform" id="${detailsId}-icon">+</span>
+                    </button>
+                    <div id="${detailsId}" class="hidden bg-stone-50 p-4 border-t border-stone-100">
+                        <ul class="list-disc list-inside space-y-1 text-sm text-stone-600">
+                            ${mod.topics.map(t => `<li>${t}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleSyllabus(id) {
+            const el = document.getElementById(id);
+            const icon = document.getElementById(`${id}-icon`);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                icon.innerText = '-';
+            } else {
+                el.classList.add('hidden');
+                icon.innerText = '+';
+            }
+        }
+
+        function renderTerms() {
+            const container = document.getElementById('terms-container');
+            container.innerHTML = '';
+            termsData.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "border-b border-stone-700 pb-3 last:border-0 last:pb-0";
+                div.innerHTML = `
+                    <h5 class="font-bold text-sm text-white mb-1">${item.term}</h5>
+                    <p class="text-xs text-stone-400">${item.def}</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- CHARTS ---
+        function initCharts() {
+            // 1. Tool Distribution (Doughnut)
+            const ctxTools = document.getElementById('toolsChart').getContext('2d');
+            
+            // Calculate counts
+            const counts = {};
+            toolsData.forEach(t => { counts[t.category] = (counts[t.category] || 0) + 1; });
+            
+            new Chart(ctxTools, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(counts),
+                    datasets: [{
+                        data: Object.values(counts),
+                        backgroundColor: ['#f97316', '#3b82f6', '#ef4444', '#10b981', '#a855f7'], // orange, blue, red, green, purple
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, font: {family: 'Inter'} } }
+                    },
+                    cutout: '70%'
+                }
+            });
+
+            // 2. Firewall Performance (Bar) - Conceptual
+            const ctxFirewall = document.getElementById('firewallChart').getContext('2d');
+            new Chart(ctxFirewall, {
+                type: 'line',
+                data: {
+                    labels: ['10 Rules', '100 Rules', '1k Rules', '10k Rules', '50k Rules'],
+                    datasets: [
+                        {
+                            label: 'iptables (Linear Processing)',
+                            data: [1, 10, 40, 80, 100],
+                            borderColor: '#78716c', // stone-500
+                            backgroundColor: 'rgba(120, 113, 108, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: 'nftables (Sets/Maps O(1))',
+                            data: [1, 2, 3, 3.5, 4], // Stays flat
+                            borderColor: '#f97316', // orange-500
+                            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.1,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Processing Time / CPU Load (Conceptual)' },
+                            grid: { display: false }
+                        },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { labels: { usePointStyle: true, font: {family: 'Inter'} } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    return ctx.dataset.label + ": " + (ctx.raw > 20 ? "High Load" : "Low Load");
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
